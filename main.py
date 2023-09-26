@@ -1,10 +1,21 @@
 import pandas as pd
-import spacy
+import pyterrier as pt
+
+if not pt.started():
+    pt.init()
+
+pd_indexer = pt.DFIndexer("./data/pd_index")
 
 # Load data from TSV file
 file_path = './data/collection_test.tsv'
 df = pd.read_csv(file_path, delimiter='\t')
+df.columns = ['docno','body']
 
+index_ref = pd_indexer.index(df['body'], df)
+index = pt.IndexFactory.of(index_ref)
+print(index.getCollectionStatistics().toString())
+
+"""
 # Load linguistic model
 nlp = spacy.load('en_core_web_sm')
 
@@ -22,4 +33,5 @@ for index, row in df.iterrows():
     doc_id = row[0]
     body = preprocess_text(row[1])
 print(body)
+"""
 
