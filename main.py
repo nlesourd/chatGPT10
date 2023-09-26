@@ -13,8 +13,13 @@ data = pd.read_csv(file_path, delimiter='\t')
 df = pd.DataFrame({'docno': data.values[:,0].astype(str),
 'text': data.values[:,1]})
 
-pd_indexer = pt.DFIndexer("./pd_index")
-indexref = pd_indexer.index(df["text"], df["docno"])
-
-index = pt.IndexFactory.of(indexref)
-print(index.getCollectionStatistics().toString())
+inverted_index_path = "./data/inverted_index"
+if not os.path.exists(inverted_index_path):
+    pd_indexer = pt.DFIndexer(inverted_index_path)
+    indexref = pd_indexer.index(df["text"], df["docno"])
+    index = pt.IndexFactory.of(indexref)
+    print(index.getCollectionStatistics().toString())
+else:
+    indexref = pt.IndexRef.of(inverted_index_path)
+    index = pt.IndexFactory.of(indexref)
+    print(index.getCollectionStatistics().toString())
