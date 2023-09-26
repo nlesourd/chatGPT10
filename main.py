@@ -1,20 +1,35 @@
-import pandas as pd
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-amd64"
 import pyterrier as pt
+import pandas as pd
 
-if not pt.started():
-    pt.init()
+collection_path = "./data/collection.tsv"
+inverted_index_path = "./data/inverted_index"
 
-# Load data from TSV file
-file_path = './data/collection_test.tsv'
-data = pd.read_csv(file_path, delimiter='\t')
+def load_inverted_index(inverted_index_path: str, collection_path: str) -> None:
+    """Generate inverted index if it not exists otherwise load it.
 
-df = pd.DataFrame({'docno': data.values[:,0].astype(str),
-'text': data.values[:,1]})
+    Args:
+        inverted_index_path: Path for the folder of inverted index.
+        collection_path: Path of TSV collection file.
 
-pd_indexer = pt.DFIndexer("./pd_index")
-indexref = pd_indexer.index(df["text"], df["docno"])
+    Returns:
+        Index loaded with pyterrier type.
+    """
+    if not pt.started():
+        pt.init()
+    data = pd.read_csv(collection_path, delimiter='\t')
+    df = pd.DataFrame({'docno': data.values[:,0].astype(str), 'text': data.values[:,1]})
 
-index = pt.IndexFactory.of(indexref)
+    if not os.path.exists(inverted_index_path):
+        pd_indexer = pt.DFIndexer(inverted_index_path)
+        indexref = pd_indexer.index(df["text"], df["docno"])
+        index = pt.IndexFactory.of(indexref)
+    else:
+        indexref = pt.IndexRef.of(inverted_index_path)
+        index = pt.IndexFactory.of(indexref)
+
+    return index
+
+index = load_inverted_index(inverted_index_path, collection_path)
 print(index.getCollectionStatistics().toString())
