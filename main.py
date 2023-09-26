@@ -1,37 +1,20 @@
 import pandas as pd
+import os
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-amd64"
 import pyterrier as pt
 
 if not pt.started():
     pt.init()
 
-pd_indexer = pt.DFIndexer("./data/pd_index")
-
 # Load data from TSV file
 file_path = './data/collection_test.tsv'
-df = pd.read_csv(file_path, delimiter='\t')
-df.columns = ['docno','body']
+data = pd.read_csv(file_path, delimiter='\t')
 
-index_ref = pd_indexer.index(df['body'], df)
-index = pt.IndexFactory.of(index_ref)
+df = pd.DataFrame({'docno': data.values[:,0].astype(str),
+'text': data.values[:,1]})
+
+pd_indexer = pt.DFIndexer("./pd_index")
+indexref = pd_indexer.index(df["text"], df["docno"])
+
+index = pt.IndexFactory.of(indexref)
 print(index.getCollectionStatistics().toString())
-
-"""
-# Load linguistic model
-nlp = spacy.load('en_core_web_sm')
-
-def preprocess_text(text):
-    doc = nlp(text)
-    # Tokenization and lemmatization
-    tokens = [token.lemma_ for token in doc]
-    # Delete stop words
-    tokens = [token for token in tokens if not nlp.vocab[token].is_stop]
-
-    tokens = [token.text for token in tokens if not token.is_punct]
-    return tokens
-
-for index, row in df.iterrows():
-    doc_id = row[0]
-    body = preprocess_text(row[1])
-print(body)
-"""
-
