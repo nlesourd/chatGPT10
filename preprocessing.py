@@ -2,6 +2,28 @@ import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-amd64"
 import pyterrier as pt
 import pandas as pd
+from sqlitedict import SqliteDict
+import csv 
+
+def textStoring(path_collection, path_sqldict):
+    if not os.path.exists(path_sqldict):
+        dictText = SqliteDict(path_sqldict)
+        # Limit of size 
+        csv.field_size_limit(4096 * 4096)
+        # Open the TSV file
+        with open(path_collection, 'r', newline='', encoding='utf-8') as tsvfile:
+            tsvreader = csv.reader(tsvfile, delimiter='\t')
+            
+            # Iteration on lines
+            for i, line in enumerate(tsvreader):
+                if i % 10000 == 0:
+                    print(i)
+                docno = line[0]
+                text = line[1]
+                dictText[docno] = text
+        dictText.update()
+        dictText.commit()
+        print("Index updated.")
 
 def load_inverted_index(inverted_index_path: str, collection_path: str) -> None:
     """Generate inverted index if it not exists otherwise load it.
