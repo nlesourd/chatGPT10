@@ -4,6 +4,12 @@ import pyterrier as pt
 import pandas as pd
 from sqlitedict import SqliteDict
 import csv 
+from typing import List
+import nltk
+import re
+nltk.download("stopwords")
+STOPWORDS = set(nltk.corpus.stopwords.words("english"))
+
 
 def textStoring(path_collection, path_sqldict):
     if not os.path.exists(path_sqldict):
@@ -54,4 +60,17 @@ def get_body(collection_path: str, docid: int) -> str:
     data = pd.read_csv(collection_path, delimiter='\t')
     return data.values[docid,1]
 
+def query_preprocessing(doc: str) -> List[str]:
+    """Preprocesses a string of text.
 
+    Arguments:
+        doc: A string of text.
+
+    Returns:
+        List of strings.
+    """
+    return [
+        term
+        for term in re.sub(r"[^\w]|_", " ", doc).lower().split()
+        if term not in STOPWORDS
+    ]

@@ -1,165 +1,132 @@
-from typing import List
+from typing import List, Dict
+from preprocessing import query_preprocessing
+import csv
+from collections import defaultdict
+import pyterrier as pt
+import re
+import numpy as np
+import pandas as pd
 
+if not pt.started():
+    pt.init()
 
-def get_confusion_matrix(
-    actual: List[int], predicted: List[int]
-) -> List[List[int]]:
+def scores_recovery(path_queries_rels:str) -> Dict:
+    """Recover the defined scores between 0 and 4 for every query.
+
+    Args:
+        path_queries_rels: path of the files with the queries and their scores
+
+    Returns:
+        Dictionnary of dictionnaries of score. First key is the query id. 
+        Second key is the docid. It allows to access to score for a given
+        query id and docid.
+    """
+    # Take the score of documents for queries
+    queries_scores = defaultdict(dict)
+    # Open the TSV file
+    with open(path_queries_rels, 'r', newline='', encoding='utf-8') as tsvfile:
+        tsvreader = csv.reader(tsvfile, delimiter='\t')
+        # Iteration on lines
+        for l in enumerate(tsvreader):
+            line = l[1][0].split()
+            qid = line[0]
+            doc_id = line[2]
+            score = int(line[3])
+            queries_scores[qid][doc_id] = score
+    return queries_scores
+
+def grade_out_of_4_rank(doc: str, results: pd.core.frame.DataFrame) -> int:
+    """Recover the defined scores between 0 and 4 for every query.
+
+    Args:
+        path_queries_rels: path of the files with the queries and their scores
+
+    Returns:
+        return the predicted score between 0 to 4
+    """
+    score = 0
+    # if ranked
+    if len(np.where(results['docid'] == int(doc))[0]) > 0:
+        rank = np.where(results['docid'] == int(doc))[0][0]
+        if rank < 30:
+            score = 4
+        elif rank < 150:
+            score = 3
+        elif rank < 600:
+            score = 2
+        else:
+            score = 1
+    return score
+
+def confusion_matrix(actuals:List[int], predictions:List[int]) -> np.array((5,5)):
     """Computes confusion matrix from lists of actual or predicted labels.
 
     Args:
-        actual: List of integers (0 or 1) representing the actual classes of
+        actuals: List of integers (0, 1, 2, 3 or 4) representing the actual classes of
             some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
+        predictions: List of integers (0, 1, 2, 3 or 4) representing the predicted classes
             of the corresponding instances.
 
     Returns:
-        List of two lists of length 2 each, representing the confusion matrix.
+        Array of size (5 * 5) representing the confusion matrix.
     """
-    FN = 0
-    FP = 0
-    # Calculation of the false positives and negatives
-    for i in range(len(actual)):
-        difference = actual[i]-predicted[i]
-        if difference == 1:
-            FN += 1
-        if difference == -1:
-            FP += 1
+    sum_errors = 0
+    errors = np.zeros((5, 5))
+    for i in range(len(actuals)):
+        sum_errors += abs(predictions[i] - actuals[i])
+        errors[predictions[i]][actuals[i]] += 1
+    print("Error rate : " + str(sum_errors/(len(actuals)*4) * 100) + "%")
+    print("Errors repartition : (lines : predictions 0 to 4, columns : actuals 0 to 4")
+    print(errors)
+    return errors
 
-    # Calculation of the true positives and negatives
-    nb_1 = actual.count(1)
-    TP = nb_1 - FN
-    nb_0 = len(actual) - nb_1
-    TN = nb_0 - FP
-
-    # Creation of the confusion matrix
-    confusion_mat = [[TN, FP], [FN, TP]]
-    return confusion_mat
-
-
-def accuracy(actual: List[int], predicted: List[int]) -> float:
-    """Computes the accuracy from lists of actual or predicted labels.
+def training_queries(path_queries_train, path_queries_rels, inverted_index_path):
+    """ Try the model and evaluate the performance by returning the matrix of confusion.
 
     Args:
-        actual: List of integers (0 or 1) representing the actual classes of
-            some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
-            of the corresponding instances.
+        path_queries_train : path of the file with the id of the queries and the queries
+        path_queries_rels : path of the file with the id of the queries and actual scores
+        inverted_index_path : path of the inverted index 
 
     Returns:
-        Accuracy as a float.
+        Array of size (5 * 5) representing the computation of the confusion matrix 
+        for the data under evaluation.
     """
-    # Recuperation of information
-    confusion_mat = get_confusion_matrix(actual, predicted)
-    TN = confusion_mat[0][0]
-    FP = confusion_mat[0][1]
-    FN = confusion_mat[1][0]
-    TP = confusion_mat[1][1]
+    # Recover the querie's scores
+    queries_scores = scores_recovery(path_queries_rels)
 
-    # Calculation
-    return (TP+TN)/(TP+FP+FN+TN)
+    # Open the TSV file
+    with open(path_queries_train, 'r', newline='', encoding='utf-8') as tsvfile:
+        tsvreader = csv.reader(tsvfile, delimiter='\t')
+        next(tsvreader)
+        batch_retriever = pt.BatchRetrieve(inverted_index_path, wmodel="BM25")
 
+        # Init of the predictions and actuals labels
+        actuals = []
+        predictions = []
+        # Iteration on lines
+        for l in enumerate(tsvreader):
+            # Recover the data
+            line = l[1][0]
+            line = re.sub(r',', ' ', line)
+            line = line.split()
+            qid = line[0]
+            query = ','.join(line[1:len((line))-2])
+            query_pp = ' '.join(query_preprocessing(query))
 
-def precision(actual: List[int], predicted: List[int]) -> float:
-    """Computes the precision from lists of actual or predicted labels.
+            # Ranking the docs relatively to the query
+            results = batch_retriever.search(query_pp)
 
-    Args:
-        actual: List of integers (0 or 1) representing the actual classes of
-            some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
-            of the corresponding instances.
+            # Fill actuals and predictions
+            for doc in queries_scores[qid]:
+                predictions.append(grade_out_of_4_rank(doc, results)) 
+                actuals.append(queries_scores[qid][doc])
 
-    Returns:
-        Precision as a float.
-    """
-    # Recuperation of information
-    confusion_mat = get_confusion_matrix(actual, predicted)
-    FP = confusion_mat[0][1]
-    TP = confusion_mat[1][1]
+    # return the confusion matrix
+    return confusion_matrix(actuals, predictions)
 
-    # Calculation
-    return TP/(TP+FP)
-
-
-def recall(actual: List[int], predicted: List[int]) -> float:
-    """Computes the recall from lists of actual or predicted labels.
-
-    Args:
-        actual: List of integers (0 or 1) representing the actual classes of
-            some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
-            of the corresponding instances.
-
-    Returns:
-        Recall as a float.
-    """
-    # Recuperation of information
-    confusion_mat = get_confusion_matrix(actual, predicted)
-    FN = confusion_mat[1][0]
-    TP = confusion_mat[1][1]
-
-    # Calculation
-    return TP/(TP+FN)
-
-
-def f1(actual: List[int], predicted: List[int]) -> float:
-    """Computes the F1-score from lists of actual or predicted labels.
-
-    Args:
-        actual: List of integers (0 or 1) representing the actual classes of
-            some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
-            of the corresponding instances.
-
-    Returns:
-        float of harmonic mean of precision and recall.
-    """
-    # Calculation
-    prec = precision(actual, predicted)
-    rec = recall(actual, predicted)
-    return 2*prec*rec/(prec+rec)
-
-
-def false_positive_rate(actual: List[int], predicted: List[int]) -> float:
-    """Computes the false positive rate from lists of actual or predicted
-        labels.
-
-    Args:
-        actual: List of integers (0 or 1) representing the actual classes of
-            some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
-            of the corresponding instances.
-
-    Returns:
-        float of number of instances incorrectly classified as positive divided
-            by number of actually negative instances.
-    """
-    # Recuperation of information
-    confusion_mat = get_confusion_matrix(actual, predicted)
-    TN = confusion_mat[0][0]
-    FP = confusion_mat[0][1]
-
-    # Calculation
-    return FP/(TN+FP)
-
-
-def false_negative_rate(actual: List[int], predicted: List[int]) -> float:
-    """Computes the false negative rate from lists of actual or predicted
-        labels.
-
-    Args:
-        actual: List of integers (0 or 1) representing the actual classes of
-            some instances.
-        predicted: List of integers (0 or 1) representing the predicted classes
-            of the corresponding instances.
-
-    Returns:
-        float of number of instances incorrectly classified as negative divided
-            by number of actually positive instances.
-    """
-    # Recuperation of information
-    confusion_mat = get_confusion_matrix(actual, predicted)
-    FN = confusion_mat[1][0]
-    TP = confusion_mat[1][1]
-
-    # Calculation
-    return FN/(FN+TP)
+# Test functions
+path_queries_rels = "data/qrels_train.txt"
+inverted_index_path = "./data/inverted_index"
+path_queries = "data/queries_train.csv"
+training_queries(path_queries, path_queries_rels, inverted_index_path)
