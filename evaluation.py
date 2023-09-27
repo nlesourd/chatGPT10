@@ -80,7 +80,7 @@ def confusion_matrix(actuals:List[int], predictions:List[int]) -> np.array((5,5)
     print(errors)
     return errors
 
-def training_queries(path_queries_train, path_queries_rels, inverted_index_path):
+def training_queries(path_queries_train, path_queries_rels, inverted_index_path) -> np.array((5,5)) :
     """ Try the model and evaluate the performance by returning the matrix of confusion.
 
     Args:
