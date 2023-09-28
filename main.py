@@ -17,18 +17,29 @@ print(index)
 print(index.getCollectionStatistics().toString())
 
 #1st Rank with BM25
-batch_retriever = pt.BatchRetrieve(inverted_index_path, wmodel="BM25")
+batch_retriever = pt.BatchRetrieve(inverted_index_path, wmodel="BM25", 
+                                   num_results=2000, controls={"wmodel": "default", "ranker.string": "default"})
 
 query = "Mickael Jackson"
 query = "Tell me about mechanical energy"
+# some queries that have to be treated specifiquely
+query = "What are Cubesats"
+query = "What can be done to stop it"
+query = "done stop"
+query = "What are some others"
+query = "What about Ivanka"
 results = batch_retriever.transform([query])
 print(results)
 print('8648995' in results['docid'])
 print(type(results))
 print(results)
 print(results.loc[2])
+size = results.shape
+nb_lines = size[0]
+print(nb_lines)
 
-pl2 = pt.BatchRetrieve(inverted_index_path, wmodel="PL2")
+pl2 = pt.BatchRetrieve(inverted_index_path, wmodel="PL2",
+                       num_results=200, controls={"wmodel": "default", "ranker.string": "default"})
 pipeline = (batch_retriever % 200) >> pl2
 pl2_re_ranked = pipeline.search(query)
 print(pl2_re_ranked)

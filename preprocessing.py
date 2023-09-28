@@ -60,7 +60,7 @@ def get_body(collection_path: str, docid: int) -> str:
     data = pd.read_csv(collection_path, delimiter='\t')
     return data.values[docid,1]
 
-def query_preprocessing(doc: str) -> List[str]:
+def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
     """Preprocesses a string of text.
 
     Arguments:
@@ -69,8 +69,14 @@ def query_preprocessing(doc: str) -> List[str]:
     Returns:
         List of strings.
     """
-    return [
-        term
-        for term in re.sub(r"[^\w]|_", " ", doc).lower().split()
-        if term not in STOPWORDS
-    ]
+    if STOPWORDS_DEL:
+        query_pp = [term for term in re.sub(r"[^\w]|_", " ", query).lower().split()
+                                            if term not in STOPWORDS]
+    # if query_pp empty or just one word
+    # use here the frequency of words !! -> course 3
+    if not(STOPWORDS_DEL) or len(query_pp) <= 1:
+        query_pp = [term for term in re.sub(r"[^\w]|_", " ", query).lower().split()]
+    
+    return query_pp
+
+print(query_preprocessing("What about Ivanka?", STOPWORDS_DEL=True))

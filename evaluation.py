@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, TextIO
 from preprocessing import query_preprocessing
 import csv
 from collections import defaultdict
@@ -52,15 +52,15 @@ def grade_out_of_4_rank(doc: str, bm25_rank: pd.core.frame.DataFrame,
     rank = bm25_rank[bm25_rank['docid'] == int(doc)].index
     # if re-ranked
     if len(re_rank) > 0:
-        rank = re_rank[0]
-        if rank < 30:
+        re_rank = re_rank[0]
+        if re_rank < 30:
             score = 4
-        elif rank < 150:
+        elif re_rank < 150:
             score = 3
         else:
             score = 2
 
-    # if ranked
+    # else if ranked
     elif len(rank) > 0:
         rank = rank[0]
         if rank < 500 :
@@ -92,6 +92,55 @@ def confusion_matrix(actuals:List[int], predictions:List[int]) -> np.array((5,5)
     print(errors)
     return errors
 
+def add_lines_trec_format(bm25_rank: pd.core.frame.DataFrame, pl2_reranked: pd.core.frame.DataFrame,
+                          results: TextIO, qid: str):
+    """ Add 1000 lines to results with the trec format
+
+    Args:
+        bm25_rank : the bm25 rank
+        pl2_reranked : the pl2 re-ranked
+        results : file where we write
+        qid : id of the query
+    """
+    # init extreme values
+    nb_lines_rr = pl2_reranked.shape[0]
+    nb_lines_r = bm25_rank.shape[0]
+    max_pl2 = pl2_reranked.loc[0]['score']
+    max_bm25 = bm25_rank.loc[0]['score']
+    min_pl2 = pl2_reranked.loc[nb_lines_rr-1]['score']
+    min_bm25 = bm25_rank.loc[nb_lines_r-1]['score']
+
+    # create a relative link between the scores of the 2 models
+    for rank in range(nb_lines_rr):
+        current_line = pl2_reranked.loc[rank]
+        query_id = qid
+        Q0 = "Q0"
+        document_id = current_line['docid']
+        # adapt the retrieval score to correspond to the same order than bm25
+        retrieval_score = (current_line['score'] - min_bm25 / (min_pl2 - min_bm25)) / (max_pl2 - min_bm25 / (min_pl2 - min_bm25))
+        run_id = "PL2"
+        runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
+        results.write(runfile_line + "\n")
+
+    # create a relative link between the scores of the 2 models
+    link_pl2_bm25 = retrieval_score
+    max200_bm25 = bm25_rank.loc[nb_lines_rr]['score']
+    for rank in range(nb_lines_rr, nb_lines_r):
+        current_line = bm25_rank.loc[rank]
+        query_id = qid
+        Q0 = "Q0"
+        document_id = current_line['docid']
+        # adapt the retrieval score to correspond to the same order than pl2
+        retrieval_score = (current_line['score'] - min_bm25) / (max200_bm25 - min_bm25) * link_pl2_bm25
+        run_id = "BM25"
+        runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
+        results.write(runfile_line + "\n")
+    
+    for rank in range(nb_lines_r, 1000):
+        # fill with a false line
+        runfile_line = f"{query_id} {Q0} {'FAUX'} {rank + 1} {0} {run_id}"
+        results.write(runfile_line + "\n")
+
 def training_queries(path_queries_train : str, path_queries_rels : str,
                       inverted_index_path : str) -> np.array((5,5)) :
     """ Try the model and evaluate the performance by returning the matrix of confusion.
@@ -107,19 +156,23 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
     """
     # Recover the querie's scores
     queries_scores = scores_recovery(path_queries_rels)
-
+    # Model for ranking
+    bm25 = pt.BatchRetrieve(inverted_index_path, num_results = 1000, wmodel="BM25")
+    # Model for re-ranking
+    pl2 = pt.BatchRetrieve(inverted_index_path, wmodel="PL2", 
+                           controls={"wmodel": "default", "ranker.string": "default"})
+    nb_reranked = 200
+        
     # Open the TSV file
     with open(path_queries_train, 'r', newline='', encoding='utf-8') as tsvfile:
+        print(type(tsvfile))
         tsvreader = csv.reader(tsvfile, delimiter='\t')
         next(tsvreader)
-        # Model for ranking
-        bm25 = pt.BatchRetrieve(inverted_index_path, num_results = 2000, wmodel="BM25")
-        # Model for re-ranking
-        pl2 = pt.BatchRetrieve(inverted_index_path, wmodel="PL2")
 
         # Init of the predictions and actuals labels
         actuals = []
         predictions = []
+        query_before = ""
         # Iteration on lines
         for l in enumerate(tsvreader):
             # Recover the data
@@ -127,15 +180,35 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
             line = re.sub(r',', ' ', line)
             line = line.split()
             qid = line[0]
-            query = ','.join(line[1:len((line))-2])
-            query_pp = ' '.join(query_preprocessing(query))
+            query = ' '.join(line[1:len((line))-2])
+            query_pp = ' '.join(query_preprocessing(query, STOPWORDS_DEL = True))
 
             # Ranking the docs relatively to the query
             bm25_rank = bm25.search(query_pp)
 
+            # if too few results, search with the entire query
+            if bm25_rank.shape[0] < 1000:
+                query_pp = ' '.join(query_preprocessing(query, STOPWORDS_DEL = False))
+                print(query)
+                bm25_rank = bm25.search(query_pp)
+                # if too few results, search with the query before combined
+                if bm25_rank.shape[0] < 1000:
+                    query_pp = ' '.join(query_preprocessing(query_before + " " + query, STOPWORDS_DEL = True))
+                    print(query_pp)
+                    bm25_rank = bm25.search(query_pp)
+
+            # memorize the last query        
+            query_before = query_pp
+
             # Re-ranking
-            pipeline = (bm25 % 200) >> pl2
+            pipeline = (bm25 % nb_reranked) >> pl2
             pl2_re_ranked = pipeline.search(query_pp)
+
+
+            # Fill the results.txt file (TREC)
+            with open("data/results.txt", "a") as results:
+                # Create 1000 new lines in the runfile
+                add_lines_trec_format(bm25_rank, pl2_re_ranked, results, qid)
 
             # Fill actuals and predictions
             for doc in queries_scores[qid]:
