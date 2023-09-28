@@ -43,14 +43,16 @@ def grade_out_of_4_rank(doc: str, bm25_rank: pd.core.frame.DataFrame,
         doc : the document to score
         bm25_rank : the bm25 rank
         pl2_reranked : the pl2 re-ranked
-        
+
     Returns:
         return the predicted score between 0 to 4
     """
     score = 0
+    re_rank = pl2_reranked[pl2_reranked['docid'] == int(doc)].index
+    rank = bm25_rank[bm25_rank['docid'] == int(doc)].index
     # if re-ranked
-    if len(np.where(pl2_reranked['docid'] == int(doc))[0]) > 0:
-        rank = np.where(pl2_reranked['docid'] == int(doc))[0][0]
+    if len(re_rank) > 0:
+        rank = re_rank[0]
         if rank < 30:
             score = 4
         elif rank < 150:
@@ -59,11 +61,11 @@ def grade_out_of_4_rank(doc: str, bm25_rank: pd.core.frame.DataFrame,
             score = 2
 
     # if ranked
-    elif len(np.where(bm25_rank['docid'] == int(doc))[0]) > 0:
-        rank = np.where(bm25_rank['docid'] == int(doc))[0][0]
+    elif len(rank) > 0:
+        rank = rank[0]
         if rank < 500 :
             score = 2
-        elif rank<1000:
+        elif rank < 1000:
             score = 1
 
     return score
