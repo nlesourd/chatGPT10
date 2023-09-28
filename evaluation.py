@@ -35,7 +35,7 @@ def scores_recovery(path_queries_rels:str) -> Dict:
             queries_scores[qid][doc_id] = score
     return queries_scores
 
-def grade_out_of_4_rank(doc: str, results: pd.core.frame.DataFrame) -> int:
+def grade_out_of_4_rank(doc: str, bm25_rank: pd.core.frame.DataFrame) -> int:
     """Recover the defined scores between 0 and 4 for every query.
 
     Args:
@@ -45,9 +45,25 @@ def grade_out_of_4_rank(doc: str, results: pd.core.frame.DataFrame) -> int:
         return the predicted score between 0 to 4
     """
     score = 0
+    # # if re-ranked
+    # if len(np.where(pl2_reranked['docid'] == int(doc))[0]) > 0:
+    #     rank = np.where(pl2_reranked['docid'] == int(doc))[0][0]
+    #     if rank < 30:
+    #         score = 4
+    #     elif rank < 150:
+    #         score = 3
+    #     else:
+    #         score = 2
     # if ranked
-    if len(np.where(results['docid'] == int(doc))[0]) > 0:
-        rank = np.where(results['docid'] == int(doc))[0][0]
+    # elif len(np.where(bm25_rank['docid'] == int(doc))[0]) > 0:
+    #     rank = np.where(bm25_rank['docid'] == int(doc))[0][0]
+    #     if rank < 500 :
+    #         score = 2
+    #     elif rank<1000:
+    #         score = 1
+    
+    if len(np.where(bm25_rank['docid'] == int(doc))[0]) > 0:
+        rank = np.where(bm25_rank['docid'] == int(doc))[0][0]
         if rank < 30:
             score = 4
         elif rank < 150:
@@ -80,7 +96,8 @@ def confusion_matrix(actuals:List[int], predictions:List[int]) -> np.array((5,5)
     print(errors)
     return errors
 
-def training_queries(path_queries_train, path_queries_rels, inverted_index_path) -> np.array((5,5)) :
+def training_queries(path_queries_train : str, path_queries_rels : str,
+                      inverted_index_path : str) -> np.array((5,5)) :
     """ Try the model and evaluate the performance by returning the matrix of confusion.
 
     Args:
@@ -99,7 +116,10 @@ def training_queries(path_queries_train, path_queries_rels, inverted_index_path)
     with open(path_queries_train, 'r', newline='', encoding='utf-8') as tsvfile:
         tsvreader = csv.reader(tsvfile, delimiter='\t')
         next(tsvreader)
-        batch_retriever = pt.BatchRetrieve(inverted_index_path, wmodel="BM25")
+        # Model for ranking
+        bm25 = pt.BatchRetrieve(inverted_index_path, num_results = 2000, wmodel="BM25")
+        # Model for re-ranking
+        pl2 = pt.BatchRetrieve(inverted_index_path, wmodel="PL2")
 
         # Init of the predictions and actuals labels
         actuals = []
@@ -115,11 +135,14 @@ def training_queries(path_queries_train, path_queries_rels, inverted_index_path)
             query_pp = ' '.join(query_preprocessing(query))
 
             # Ranking the docs relatively to the query
-            results = batch_retriever.search(query_pp)
+            bm25_rank = bm25.search(query_pp)
+
+            # Re-ranking
+            # pl2_re_ranked = (bm25 % 200) >> pl2.search(query_pp)
 
             # Fill actuals and predictions
             for doc in queries_scores[qid]:
-                predictions.append(grade_out_of_4_rank(doc, results)) 
+                predictions.append(grade_out_of_4_rank(doc, bm25_rank)) # ,pl2_re_ranked)) 
                 actuals.append(queries_scores[qid][doc])
 
     # return the confusion matrix
