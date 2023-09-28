@@ -13,21 +13,24 @@ inverted_index_path = "./data/inverted_index"
 print("Inverted index")
 index = ppc.load_inverted_index(inverted_index_path, collection_path)
 print(index)
-for i in index:
-    print(i)
 
+print(index.getCollectionStatistics().toString())
 
-# print(index.getCollectionStatistics().toString())
+#1st Rank with BM25
+batch_retriever = pt.BatchRetrieve(inverted_index_path, wmodel="BM25")
 
-# #1st Rank with BM25
-# batch_retriever = pt.BatchRetrieve(inverted_index_path, wmodel="BM25")
+query = "Mickael Jackson"
+query = "Tell me about mechanical energy"
+results = batch_retriever.transform([query])
+print(results)
+print('8648995' in results['docid'])
+print(type(results))
+print(results)
 
-# query = "Mickael Jackson"
-# results = batch_retriever.transform([query])
-# print(results)
-# print('8648995' in results['docid'])
-# print(type(results))
-# print(results['docid'])
+pl2 = pt.BatchRetrieve(inverted_index_path, wmodel="PL2")
+pipeline = (batch_retriever % 200) >> pl2
+pl2_re_ranked = pipeline.search(query)
+print(pl2_re_ranked)
 # print(np.where(results['docid'] == 6391464)[0][0])
 # type(results['docid'])
 

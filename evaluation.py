@@ -35,43 +35,37 @@ def scores_recovery(path_queries_rels:str) -> Dict:
             queries_scores[qid][doc_id] = score
     return queries_scores
 
-def grade_out_of_4_rank(doc: str, bm25_rank: pd.core.frame.DataFrame) -> int:
+def grade_out_of_4_rank(doc: str, bm25_rank: pd.core.frame.DataFrame, 
+                        pl2_reranked: pd.core.frame.DataFrame) -> int:
     """Recover the defined scores between 0 and 4 for every query.
 
     Args:
-        path_queries_rels: path of the files with the queries and their scores
-
+        doc : the document to score
+        bm25_rank : the bm25 rank
+        pl2_reranked : the pl2 re-ranked
+        
     Returns:
         return the predicted score between 0 to 4
     """
     score = 0
-    # # if re-ranked
-    # if len(np.where(pl2_reranked['docid'] == int(doc))[0]) > 0:
-    #     rank = np.where(pl2_reranked['docid'] == int(doc))[0][0]
-    #     if rank < 30:
-    #         score = 4
-    #     elif rank < 150:
-    #         score = 3
-    #     else:
-    #         score = 2
-    # if ranked
-    # elif len(np.where(bm25_rank['docid'] == int(doc))[0]) > 0:
-    #     rank = np.where(bm25_rank['docid'] == int(doc))[0][0]
-    #     if rank < 500 :
-    #         score = 2
-    #     elif rank<1000:
-    #         score = 1
-    
-    if len(np.where(bm25_rank['docid'] == int(doc))[0]) > 0:
-        rank = np.where(bm25_rank['docid'] == int(doc))[0][0]
+    # if re-ranked
+    if len(np.where(pl2_reranked['docid'] == int(doc))[0]) > 0:
+        rank = np.where(pl2_reranked['docid'] == int(doc))[0][0]
         if rank < 30:
             score = 4
         elif rank < 150:
             score = 3
-        elif rank < 600:
-            score = 2
         else:
+            score = 2
+
+    # if ranked
+    elif len(np.where(bm25_rank['docid'] == int(doc))[0]) > 0:
+        rank = np.where(bm25_rank['docid'] == int(doc))[0][0]
+        if rank < 500 :
+            score = 2
+        elif rank<1000:
             score = 1
+
     return score
 
 def confusion_matrix(actuals:List[int], predictions:List[int]) -> np.array((5,5)):
@@ -138,11 +132,12 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
             bm25_rank = bm25.search(query_pp)
 
             # Re-ranking
-            # pl2_re_ranked = (bm25 % 200) >> pl2.search(query_pp)
+            pipeline = (bm25 % 200) >> pl2
+            pl2_re_ranked = pipeline.search(query_pp)
 
             # Fill actuals and predictions
             for doc in queries_scores[qid]:
-                predictions.append(grade_out_of_4_rank(doc, bm25_rank)) # ,pl2_re_ranked)) 
+                predictions.append(grade_out_of_4_rank(doc, bm25_rank, pl2_re_ranked)) 
                 actuals.append(queries_scores[qid][doc])
 
     # return the confusion matrix
