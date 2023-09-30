@@ -28,6 +28,7 @@ query = "What can be done to stop it"
 query = "done stop"
 query = "What are some others"
 query = "What about Ivanka"
+
 results = batch_retriever.transform([query])
 print(results)
 print('8648995' in results['docid'])

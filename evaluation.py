@@ -1,4 +1,4 @@
-from typing import List, Dict, TextIO
+from typing import List, Dict, TextIO, Union
 from preprocessing import query_preprocessing
 import csv
 from collections import defaultdict
@@ -92,7 +92,7 @@ def confusion_matrix(actuals:List[int], predictions:List[int]) -> np.array((5,5)
     print(errors)
     return errors
 
-def add_lines_trec_format(bm25_rank: pd.core.frame.DataFrame, pl2_reranked: pd.core.frame.DataFrame,
+def add_lines_trec_format(bm25_rank: pd.core.frame.DataFrame, pl2_reranked: Union[pd.core.frame.DataFrame, None],
                           results: TextIO, qid: str):
     """ Add 1000 lines to results with the trec format
 
@@ -102,43 +102,61 @@ def add_lines_trec_format(bm25_rank: pd.core.frame.DataFrame, pl2_reranked: pd.c
         results : file where we write
         qid : id of the query
     """
-    # init extreme values
-    nb_lines_rr = pl2_reranked.shape[0]
-    nb_lines_r = bm25_rank.shape[0]
-    max_pl2 = pl2_reranked.loc[0]['score']
-    max_bm25 = bm25_rank.loc[0]['score']
-    min_pl2 = pl2_reranked.loc[nb_lines_rr-1]['score']
-    min_bm25 = bm25_rank.loc[nb_lines_r-1]['score']
-
-    # create a relative link between the scores of the 2 models
-    for rank in range(nb_lines_rr):
-        current_line = pl2_reranked.loc[rank]
-        query_id = qid
-        Q0 = "Q0"
-        document_id = current_line['docid']
-        # adapt the retrieval score to correspond to the same order than bm25
-        retrieval_score = (current_line['score'] - min_bm25 / (min_pl2 - min_bm25)) / (max_pl2 - min_bm25 / (min_pl2 - min_bm25))
-        run_id = "PL2"
-        runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
-        results.write(runfile_line + "\n")
-
-    # create a relative link between the scores of the 2 models
-    link_pl2_bm25 = retrieval_score
-    max200_bm25 = bm25_rank.loc[nb_lines_rr]['score']
-    for rank in range(nb_lines_rr, nb_lines_r):
-        current_line = bm25_rank.loc[rank]
-        query_id = qid
-        Q0 = "Q0"
-        document_id = current_line['docid']
-        # adapt the retrieval score to correspond to the same order than pl2
-        retrieval_score = (current_line['score'] - min_bm25) / (max200_bm25 - min_bm25) * link_pl2_bm25
-        run_id = "BM25"
-        runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
-        results.write(runfile_line + "\n")
+    if type(pl2_reranked) != pd.core.frame.DataFrame:
+        nb_lines = 1000
+        max_bm25 = bm25_rank.loc[0]['score']
+        min_bm25 = bm25_rank.loc[nb_lines-1]['score']
+        for rank in range(0, nb_lines):
+            current_line = bm25_rank.loc[rank]
+            query_id = qid
+            Q0 = "Q0"
+            document_id = current_line['docid']
+            # adapt the retrieval score to correspond to the same order than pl2
+            retrieval_score = (current_line['score'] - min_bm25) / (max_bm25 - min_bm25)
+            run_id = "BM25"
+            runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
+            results.write(runfile_line + "\n")
     
-    for rank in range(nb_lines_r, 1000):
-        # fill with a false line
-        runfile_line = f"{query_id} {Q0} {'FAUX'} {rank + 1} {0} {run_id}"
+    else:
+        # init extreme values
+        nb_lines_rr = pl2_reranked.shape[0]
+        nb_lines_r = bm25_rank.shape[0]
+        print(pl2_reranked.loc[0]['docid'])
+        max_pl2 = pl2_reranked.loc[0]['score']
+        max_bm25 = bm25_rank.loc[0]['score']
+        min_pl2 = pl2_reranked.loc[nb_lines_rr-1]['score']
+        min_bm25 = bm25_rank.loc[nb_lines_r-1]['score']
+
+        # create a relative link between the scores of the 2 models
+        for rank in range(nb_lines_rr):
+            current_line = pl2_reranked.loc[rank]
+            query_id = qid
+            Q0 = "Q0"
+            document_id = current_line['docid']
+            # adapt the retrieval score to correspond to the same order than bm25
+            retrieval_score = (current_line['score'] - min_bm25 / (min_pl2 - min_bm25)) / (max_pl2 - min_bm25 / (min_pl2 - min_bm25))
+            run_id = "PL2"
+            runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
+            results.write(runfile_line + "\n")
+
+        # create a relative link between the scores of the 2 models
+        link_pl2_bm25 = retrieval_score
+        max200_bm25 = bm25_rank.loc[nb_lines_rr]['score']
+        for rank in range(nb_lines_rr, nb_lines_r):
+            current_line = bm25_rank.loc[rank]
+            query_id = qid
+            Q0 = "Q0"
+            document_id = current_line['docid']
+            # adapt the retrieval score to correspond to the same order than pl2
+            retrieval_score = (current_line['score'] - min_bm25) / (max200_bm25 - min_bm25) * link_pl2_bm25
+            run_id = "BM25"
+            runfile_line = f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}"
+            results.write(runfile_line + "\n")
+        
+        # To see if there are errors
+        for rank in range(nb_lines_r, 1000):
+            # fill with a false line
+            runfile_line = f"{query_id} {Q0} {'FAUX'} {rank + 1} {0} {run_id}"
         results.write(runfile_line + "\n")
 
 def training_queries(path_queries_train : str, path_queries_rels : str,
@@ -180,6 +198,13 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
             line = re.sub(r',', ' ', line)
             line = line.split()
             qid = line[0]
+
+            # with open("data/reduced_qrels/first_query_queries.csv", "a") as file:
+            #     if int(qid[-1])==1:
+            #         print(qid)
+            #         print("écriture")
+            #         file.write(str(l) + "\n")
+
             query = ' '.join(line[1:len((line))-2])
             query_pp = ' '.join(query_preprocessing(query, STOPWORDS_DEL = True))
 
@@ -204,10 +229,10 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
             pipeline = (bm25 % nb_reranked) >> pl2
             pl2_re_ranked = pipeline.search(query_pp)
 
-
             # Fill the results.txt file (TREC)
             with open("data/results.txt", "a") as results:
                 # Create 1000 new lines in the runfile
+                # Put None instead of pl2_re_ranked if don't want a re-rank
                 add_lines_trec_format(bm25_rank, pl2_re_ranked, results, qid)
 
             # Fill actuals and predictions
@@ -219,7 +244,11 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
     return confusion_matrix(actuals, predictions)
 
 # Test functions
-path_queries_rels = "data/qrels_train.txt"
+# path_queries_rels = "data/qrels_train.txt"
 inverted_index_path = "./data/inverted_index"
-path_queries = "data/queries_train.csv"
+# path_queries = "data/queries_train.csv"
+
+# With only the first queries
+path_queries = "data/reduced_qrels/first_query_queries.csv"
+path_queries_rels = "data/reduced_qrels/first_query_qrels.txt"
 training_queries(path_queries, path_queries_rels, inverted_index_path)
