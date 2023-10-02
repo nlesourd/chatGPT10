@@ -160,7 +160,7 @@ def add_lines_trec_format(bm25_rank: pd.core.frame.DataFrame, pl2_reranked: Unio
         results.write(runfile_line + "\n")
 
 def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_output: str, qid:int, 
-                                 nb_lines = 1000, run_id = "PL2"):
+                                 nb_lines = 1000, run_id = "monoT5"):
     """ Add 1000 lines to results with the trec format
 
     Args:
