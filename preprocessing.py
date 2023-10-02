@@ -31,6 +31,16 @@ def textStoring(path_collection, path_sqldict):
         dictText.commit()
         print("Index updated.")
 
+def set_subcollection(collection_path:str, subcollection_path:str, indexes: List):
+    with open(collection_path, "r", encoding="utf-8") as collection:
+        lines = collection.readlines()
+
+    selected_lines = [lines[i] for i in indexes]
+
+    with open(subcollection_path, "w", encoding="utf-8") as subcollection:
+        subcollection.writelines(selected_lines)
+
+
 def load_inverted_index(inverted_index_path: str, collection_path: str) -> None:
     """Generate inverted index if it not exists otherwise load it.
 
@@ -57,6 +67,15 @@ def load_inverted_index(inverted_index_path: str, collection_path: str) -> None:
     return index
 
 def get_body(collection_path: str, docid: int) -> str:
+    """Get body according a docid and collection.
+
+    Arguments:
+        collection_path: path to reach the collection of documents.
+        docid: integer to identify the right document.
+
+    Returns:
+        Body of the document.
+    """
     data = pd.read_csv(collection_path, delimiter='\t')
     return data.values[docid,1]
 

@@ -20,5 +20,18 @@ Or using requirements.txt like this:
 
 `python3 main.py`
 
-## Test the code
+## Test the results
 
+Download TREC Eval and compile it
+
+"""bash
+git clone https://github.com/usnistgov/trec_eval.git
+cd trec_eval
+make
+"""
+
+Test
+
+"""bash
+./trec_eval -q qrels_file results_file
+"""

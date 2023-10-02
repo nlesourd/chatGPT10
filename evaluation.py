@@ -159,6 +159,30 @@ def add_lines_trec_format(bm25_rank: pd.core.frame.DataFrame, pl2_reranked: Unio
             runfile_line = f"{query_id} {Q0} {'FAUX'} {rank + 1} {0} {run_id}"
         results.write(runfile_line + "\n")
 
+def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_output: str, qid:int, 
+                                 nb_lines = 1000, run_id = "PL2"):
+    """ Add 1000 lines to results with the trec format
+
+    Args:
+        results: Dataframe results of the retrieval ranking of each document with qid, docid, docno, rank, score and query
+        path_file_output: path of the output file with TREC format
+        nb_lines: optional, nuumber of documents ranked
+        run_id, optional, id of retrieval process  
+    """
+    results_max = max(results['score'])
+    lines = ""
+    for rank in range(0, nb_lines):
+        current_line = results.loc[rank]
+        query_id = qid
+        document_id = current_line['docid']
+        retrieval_score = current_line['score'] / results_max # to normalize the score
+        Q0 = "Q0"
+        lines += f"{query_id} {Q0} {document_id} {rank + 1} {retrieval_score} {run_id}\n"
+
+    with open(path_file_output, "w") as results_file:
+        results_file.write(lines)
+    
+    
 def training_queries(path_queries_train : str, path_queries_rels : str,
                       inverted_index_path : str) -> np.array((5,5)) :
     """ Try the model and evaluate the performance by returning the matrix of confusion.
@@ -243,6 +267,7 @@ def training_queries(path_queries_train : str, path_queries_rels : str,
     # return the confusion matrix
     return confusion_matrix(actuals, predictions)
 
+"""
 # Test functions
 # path_queries_rels = "data/qrels_train.txt"
 inverted_index_path = "./data/inverted_index"
@@ -252,3 +277,4 @@ inverted_index_path = "./data/inverted_index"
 path_queries = "data/reduced_qrels/first_query_queries.csv"
 path_queries_rels = "data/reduced_qrels/first_query_qrels.txt"
 training_queries(path_queries, path_queries_rels, inverted_index_path)
+"""
