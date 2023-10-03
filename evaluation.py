@@ -36,7 +36,10 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
 def rank_query(query : str, model_rank : pt.BatchRetrieve, model_rerank : pt.BatchRetrieve, 
                nb_reranked : int) -> pd.core.frame.DataFrame:
     # Ranking & Re-ranking the docs relatively to the query
-    pipeline = (model_rank % nb_reranked) >> model_rerank
+    if model_rerank == None:
+        pipeline = model_rank
+    else:
+        pipeline = (model_rank % nb_reranked) >> model_rerank
     final_rank = pipeline.search(query)
     return final_rank
 
@@ -57,13 +60,16 @@ def rank_queries(path_queries : str, path_file_output, model_rank : pt.BatchRetr
 
             # preprocess the query
             query_pp = query_preprocessing(query, STOPWORDS_DEL = False)
+            print(query_pp)
 
             # Apply a documents's ranking
             ranking = rank_query(query_pp, model_rank, model_rerank, nb_reranked)
             set_results_with_trec_format(ranking, path_file_output, qid, nb_lines = 1000, run_id = "monoT5")
 
-model_rank = pt.BatchRetrieve("./data/inverted_index", wmodel="BM25")
-model_rerank = pt.BatchRetrieve("./data/inverted_index", wmodel="PL2")
+# model_rank = pt.BatchRetrieve("./data/inverted_index", wmodel="BM25", 
+#                               controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
+# model_rerank = pt.BatchRetrieve("./data/inverted_index", wmodel="PL2", 
+#                                 controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
 
-rank_queries("data/reduced_qrels/first_query_queries.csv", "data/results.txt", model_rank , 
-                 model_rerank, nb_reranked=1000)
+# rank_queries("data/reduced_qrels/first_query_queries.csv", "data/results.txt", model_rank , 
+#                  model_rerank, nb_reranked=1000)
