@@ -20,12 +20,12 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
         nb_lines: optional, nuumber of documents ranked
         run_id, optional, id of retrieval process  
     """
+    results.sort_values(by=["score"], ascending=False, inplace=True)
+    rank = 0
     lines = ""
     for rank in range(0, nb_lines):
         current_line = results.loc[rank]
         query_id = qid
-        document_no = current_line['docno']
-        retrieval_score = current_line['score']
         Q0 = "Q0"
         lines += f"{query_id} {Q0} {int(document_no)} {rank} {retrieval_score} {run_id}\n"
 
