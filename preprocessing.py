@@ -76,8 +76,18 @@ def get_body(collection_path: str, docid: int) -> str:
     Returns:
         Body of the document.
     """
-    data = pd.read_csv(collection_path, delimiter='\t')
-    return data.values[docid,1]
+    collection = pd.read_csv(collection_path, delimiter='\t')
+    return collection.values[docid,1]
+
+def rerank_preprocessing(collection_path:str, results: pd.DataFrame) -> pd.DataFrame:
+    collection = pd.read_csv(collection_path, delimiter='\t')
+    texts = []
+    nb_texts = len(results["qid"])
+    for i, docno in enumerate(results["docno"]):
+        print("Texts processed: ", (i*100)/nb_texts, " %")
+        texts.append(collection.values[int(docno)-1,1])
+    input_rerank = pd.DataFrame({'qid':results["qid"], 'query':results["query"], 'docno':results["docno"], 'text':texts})
+    return input_rerank
 
 def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
     """Preprocesses a string of text.
