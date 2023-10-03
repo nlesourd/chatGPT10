@@ -18,23 +18,18 @@ print(index.getCollectionStatistics().toString())
 
 model_rank = pt.BatchRetrieve("./data/inverted_index", wmodel="BM25", 
                               controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
-# bo1 = pt.rewrite.Bo1QueryExpansion(index)
-# dph = model_rank
-# pipelineQE = dph >> bo1 >> dph
-# model_rerank = pt.BatchRetrieve("./data/inverted_index", wmodel="PL2", 
-#                                 controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
+
+bm25_results = model_rank.transform(model_rank.transform(query))
+bo1 = pt.rewrite.Bo1QueryExpansion(index)
+dph = model_rank
+pipelineQE = dph >> bo1 >> dph
+model_rerank = None
 
 # eval.rank_queries("data/reduced_qrels/first_query_queries.csv", "data/results.txt", model_rank, 
 #                  None, nb_reranked=1000)
 eval.rank_queries("data/queries_train.csv", "data/results.txt", model_rank, 
-                 None, nb_reranked=1000)
+                 model_rerank, nb_reranked=1000)
 
-"""
-# 1st Rank with BM25
-num_documents_1st_rank = 1000
-bm25 = pt.BatchRetrieve(index, wmodel="BM25", num_results=num_documents_1st_rank, controls={"wmodel": "default", "ranker.string": "default", "results": num_documents_1st_rank})
-bm25_results = bm25.transform(query)
-"""
 input_rerank = ppc.rerank_preprocessing(collection_path, bm25_results)
 
 # Rerank top 1000 documents with monoT5
@@ -44,12 +39,8 @@ monoT5_results = monoT5.transform(input_rerank)
 #Evaluation
 #ppc.set_subcollection(collection_path, subcollection_path, results['docid'])
 qid = "4_1"
-<<<<<<< HEAD
-eval.set_results_with_trec_format(bm25_results, trec_file_path, qid, nb_lines=num_documents_1st_rank, run_id="bm25")
-=======
 eval.set_results_with_trec_format(monoT5_results, trec_file_path, qid, nb_lines=num_documents_1st_rank, run_id="mono_T5")
 """
->>>>>>> fa1bba8059eb44ad6d144be94751f5b0be491751
 
 """
 # some queries that have to be treated specifiquely

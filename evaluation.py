@@ -69,7 +69,14 @@ def rank_queries(path_queries : str, path_file_output, model_rank : pt.BatchRetr
 
             # Apply a documents's ranking
             ranking = rank_query(query_pp, model_rank, model_rerank, nb_reranked)
+            if ranking.shape[0]<1000:
+                print(qid)
+                query_pp = query_before + " " + query_pp
+                ranking = rank_query(query_pp, model_rank, model_rerank, nb_reranked)
             set_results_with_trec_format(ranking, path_file_output, qid, nb_lines = 1000, run_id = "monoT5")
+
+            # keep track of the last query
+            query_before = query_pp
 
 # model_rank = pt.BatchRetrieve("./data/inverted_index", wmodel="BM25", 
 #                               controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
