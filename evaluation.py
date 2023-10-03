@@ -21,12 +21,10 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
         run_id, optional, id of retrieval process  
     """
     results.sort_values(by=["score"], ascending=False, inplace=True)
-    print(results["docno"],results["score"])
     rank = 0
     lines = ""
     for document_no, retrieval_score in zip(results['docno'], results['score']):
         query_id = qid
-        print(retrieval_score)
         Q0 = "Q0"
         lines += f"{query_id} {Q0} {document_no} {rank} {retrieval_score} {run_id}\n"
         rank += 1
