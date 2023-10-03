@@ -27,6 +27,8 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
         current_line = results.loc[rank]
         query_id = qid
         Q0 = "Q0"
+        document_no = current_line['docno']
+        retrieval_score = current_line['score']
         lines += f"{query_id} {Q0} {int(document_no)} {rank} {retrieval_score} {run_id}\n"
 
     with open(path_file_output, "a") as results_file:
@@ -45,7 +47,10 @@ def rank_query(query : str, model_rank : pt.BatchRetrieve, model_rerank : pt.Bat
 
 def rank_queries(path_queries : str, path_file_output, model_rank : pt.BatchRetrieve, 
                  model_rerank : pt.BatchRetrieve, nb_reranked : str) :
-    # Open the queries's TSV file
+    # Empty the file
+    with open(path_file_output, 'w') as tsvfile:
+        tsvfile.truncate()
+    # Open the queries's file
     with open(path_queries, 'r', newline='', encoding='utf-8') as tsvfile:
         print(type(tsvfile))
         tsvreader = csv.reader(tsvfile, delimiter='\t')

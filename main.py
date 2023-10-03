@@ -18,12 +18,16 @@ print(index.getCollectionStatistics().toString())
 
 model_rank = pt.BatchRetrieve("./data/inverted_index", wmodel="BM25", 
                               controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
+# bo1 = pt.rewrite.Bo1QueryExpansion(index)
+# dph = model_rank
+# pipelineQE = dph >> bo1 >> dph
 # model_rerank = pt.BatchRetrieve("./data/inverted_index", wmodel="PL2", 
 #                                 controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
 
-eval.rank_queries("data/reduced_qrels/first_query_queries.csv", "data/results.txt", model_rank , 
+# eval.rank_queries("data/reduced_qrels/first_query_queries.csv", "data/results.txt", model_rank, 
+#                  None, nb_reranked=1000)
+eval.rank_queries("data/queries_train.csv", "data/results.txt", model_rank, 
                  None, nb_reranked=1000)
-
 
 """
 # 1st Rank with BM25
