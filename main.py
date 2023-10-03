@@ -25,12 +25,12 @@ input_rerank = ppc.rerank_preprocessing(collection_path, bm25_results)
 
 # Rerank top 1000 documents with monoT5
 monoT5 = MonoT5ReRanker() # loads castorini/monot5-base-msmarco by default
-results = monoT5.transform(input_rerank)
+monoT5_results = monoT5.transform(input_rerank)
 
 #Evaluation
 #ppc.set_subcollection(collection_path, subcollection_path, results['docid'])
 qid = "4_1"
-eval.set_results_with_trec_format(results, trec_file_path, qid, nb_lines=num_documents_1st_rank, run_id="mono_T5")
+eval.set_results_with_trec_format(monoT5_results, trec_file_path, qid, nb_lines=num_documents_1st_rank, run_id="mono_T5")
 
 """
 # some queries that have to be treated specifiquely
