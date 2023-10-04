@@ -6,7 +6,13 @@ All the libraries in the list below must be on your machine in order to run the 
 
 - os
 - pyterrier
+- pyterrier_t5
 - pandas
+- csv
+- os
+- typing
+- nltk
+- re
 
 If you don't have one of these libraries, you can install it using the python pip package manager.
 
