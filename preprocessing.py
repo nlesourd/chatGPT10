@@ -106,6 +106,6 @@ def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
     if not(STOPWORDS_DEL) or len(query_pp) <= 1:
         query_pp = [term for term in re.sub(r"[^\w]|_", " ", query).lower().split()]
     
-    return query_pp
+    return ' '.join(query_pp)
 
 print(query_preprocessing("What about Ivanka?", STOPWORDS_DEL=True))

@@ -2,6 +2,21 @@ import preprocessing as ppc
 import evaluation as eval
 import pyterrier as pt
 from pyterrier_t5 import MonoT5ReRanker, DuoT5ReRanker
+import csv
+from elasticsearch import Elasticsearch
+
+# import torch
+# import onmt
+# from torchvision import models
+
+# model = models.resnet18()
+# model.load_state_dict(torch.load('../rewrite_onmt/rewrite_onmt_step_200000.pt', map_location=torch.device('cpu')))
+# model.eval()
+# print(model)
+
+es = Elasticsearch()
+print(es.get(index="index_texts", id='7231102')['_source']['content'])
+# print(es.indices.stats(index="index_texts"))
 
 collection_path = "./data/collection.tsv"
 subcollection_path = "./data/subcollection.tsv"
@@ -19,16 +34,25 @@ print(index.getCollectionStatistics().toString())
 model_rank = pt.BatchRetrieve("./data/inverted_index", wmodel="BM25", 
                               controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
 
-bm25_results = model_rank.transform(model_rank.transform(query))
+
+bm25_results = model_rank.transform(model_rank.search(query))
+print(type(bm25_results))
 bo1 = pt.rewrite.Bo1QueryExpansion(index)
 dph = model_rank
 pipelineQE = dph >> bo1 >> dph
-model_rerank = None
 
 # eval.rank_queries("data/reduced_qrels/first_query_queries.csv", "data/results.txt", model_rank, 
 #                  None, nb_reranked=1000)
-eval.rank_queries("data/queries_train.csv", "data/results.txt", model_rank, 
-                 model_rerank, nb_reranked=1000)
+
+monoT5 = MonoT5ReRanker()
+# eval.rank_queries("data/queries_train.csv", "data/results.txt", pipelineQE, 
+#                  None, nb_reranked=1000, nb_lines = 1000, kaggle = False)
+
+# eval.rank_queries("data/queries_test.csv", "data/kaggle.csv", pipelineQE, 
+#                   monoT5, nb_reranked=1000, nb_lines = 1000, kaggle = True)
+
+eval.rank_queries("data/reduced_qrels/queries_test_suite.csv", "data/kaggle.csv", pipelineQE, 
+                  monoT5, nb_reranked=1000, nb_lines = 1000, kaggle = True)
 
 input_rerank = ppc.rerank_preprocessing(collection_path, bm25_results)
 

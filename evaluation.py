@@ -6,12 +6,16 @@ import pyterrier as pt
 import re
 import numpy as np
 import pandas as pd
+from pyterrier_t5 import MonoT5ReRanker
+from elasticsearch import Elasticsearch
 
+# Init
+es = Elasticsearch()
 if not pt.started():
     pt.init()
 
 def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_output: str, qid:int, 
-                                 nb_lines = 1000, run_id = "monoT5"):
+                                 nb_lines : int, kaggle : bool, run_id = "monoT5"):
     """ Add 1000 lines to results with the trec format
 
     Args:
@@ -23,30 +27,49 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
     results.sort_values(by=["score"], ascending=False, inplace=True)
     rank = 0
     lines = ""
-    for rank in range(0, nb_lines):
-        current_line = results.loc[rank]
-        query_id = qid
+    max_score = results['score'].max()
+    min_score = results['score'].min()
+    for document_no, retrieval_score in zip(results['docno'], results['score']):
         Q0 = "Q0"
-        document_no = current_line['docno']
-        retrieval_score = current_line['score']
-        lines += f"{query_id} {Q0} {int(document_no)} {rank} {retrieval_score} {run_id}\n"
-
+        retrieval_score = (retrieval_score - min_score) / (max_score - min_score)
+        if kaggle:
+            lines += f"{qid},{int(document_no)}\n"
+        else:
+            lines += f"{qid} {Q0} {int(document_no)} {rank} {retrieval_score} {run_id}\n"
     with open(path_file_output, "a") as results_file:
         results_file.write(lines)
-    
-    
+
 def rank_query(query : str, model_rank : pt.BatchRetrieve, model_rerank : pt.BatchRetrieve, 
-               nb_reranked : int) -> pd.core.frame.DataFrame:
-    # Ranking & Re-ranking the docs relatively to the query
+               nb_reranked : int, query_before : str) -> pd.core.frame.DataFrame:
+    # Ranking the docs relatively to the query
+    results_rank = model_rank.search(query)
+    if results_rank.shape[0]<1000:
+        print(query)
+        results_rank = model_rank.search(query_before + " " + query)
+    # Re-Ranking the docs relatively to the query
     if model_rerank == None:
         pipeline = model_rank
+        final_rank = pipeline.search(query)
+    # Mono-T5 re-ranking
+    elif isinstance(model_rerank, MonoT5ReRanker):
+        # Add the text to the results
+        l_texts = []
+        for i in range(nb_reranked):
+            doc_no = results_rank.loc[i]['docno']
+            l_texts.append(es.get(index="index_texts", id=doc_no)['_source']['content'])
+        results_rank['text'] = l_texts
+        final_rank = model_rerank.transform(results_rank)
+        # Sort
+        final_rank.sort_values(by='score', ascending=False, inplace=True)
+        print(final_rank)
+    # Other re-ranking
     else:
-        pipeline = (model_rank % nb_reranked) >> model_rerank
-    final_rank = pipeline.search(query)
+        final_rank = model_rerank.transform(results_rank)
     return final_rank
 
 def rank_queries(path_queries : str, path_file_output, model_rank : pt.BatchRetrieve, 
-                 model_rerank : pt.BatchRetrieve, nb_reranked : str) :
+                 model_rerank : pt.BatchRetrieve, nb_reranked : str, nb_lines = 1000, kaggle = False) :
+    query_before = ""
     # Empty the file
     with open(path_file_output, 'w') as tsvfile:
         tsvfile.truncate()
@@ -68,12 +91,9 @@ def rank_queries(path_queries : str, path_file_output, model_rank : pt.BatchRetr
             print(query_pp)
 
             # Apply a documents's ranking
-            ranking = rank_query(query_pp, model_rank, model_rerank, nb_reranked)
-            if ranking.shape[0]<1000:
-                print(qid)
-                query_pp = query_before + " " + query_pp
-                ranking = rank_query(query_pp, model_rank, model_rerank, nb_reranked)
-            set_results_with_trec_format(ranking, path_file_output, qid, nb_lines = 1000, run_id = "monoT5")
+            ranking = rank_query(query_pp, model_rank, model_rerank, nb_reranked, query_before)
+            query_pp = query_before + " " + query_pp
+            set_results_with_trec_format(ranking, path_file_output, qid, nb_lines, kaggle, run_id = "monoT5")
 
             # keep track of the last query
             query_before = query_pp
