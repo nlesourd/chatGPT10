@@ -1,0 +1,6 @@
+# some queries that have to be treated specifiquely
+query = "What are Cubesats"
+query = "What can be done to stop it"
+query = "done stop"
+query = "What are some others"
+query = "What about Ivanka"
