@@ -37,32 +37,3 @@ class AdvancedMethod:
         print(query_ppc)
         self.queries.append(query_ppc)
         return self.first_rank_model.search(query_ppc)
-  
-
-"""
-def rank_query(self, query : str, method, query_before : str) -> pd.core.frame.DataFrame:
-        # Ranking the docs relatively to the query
-        results_rank = method.first_rank_model.search(query)
-        if results_rank.shape[0]<1000:
-            print(query)
-            results_rank = method.first_rank_model.search(query_before + " " + query)
-        # Re-Ranking the docs relatively to the query
-        if method.rerank_model == None:
-            pipeline = method.first_rank_model
-            final_rank = pipeline.search(query)
-        # Mono-T5 re-ranking
-        elif isinstance(method.rerank_model, MonoT5ReRanker):
-            # Add the text to the results
-            l_texts = []
-            for i in range(self.nb_reranked):
-                doc_no = results_rank.loc[i]['docno']
-                l_texts.append(es.get(index="index_texts", id=doc_no)['_source']['content'])
-            results_rank['text'] = l_texts
-            final_rank = method.rerank_model.transform(results_rank)
-            # Sort
-            final_rank.sort_values(by='score', ascending=False, inplace=True)
-            print(final_rank)
-        # Other re-ranking
-
-        return final_rank
-"""
