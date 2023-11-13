@@ -34,8 +34,7 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
     with open(path_file_output, "a") as results_file:
         results_file.write(lines)
 
-def rank_queries(path_queries: str, path_file_output, method, nb_lines = 1000, kaggle = False) :
-    query_before = ""
+def rank_queries(path_queries: str, path_file_output, method, nb_lines = 1000, kaggle = False):
     # Empty the file
     with open(path_file_output, 'w') as tsvfile:
         tsvfile.truncate()
@@ -53,8 +52,4 @@ def rank_queries(path_queries: str, path_file_output, method, nb_lines = 1000, k
 
             # Apply a documents's ranking
             ranking = method.rank_query(query)
-            query = query_before + " " + query
             set_results_with_trec_format(ranking, path_file_output, qid, nb_lines, kaggle, run_id = "monoT5")
-
-            # keep track of the last query
-            query_before = query

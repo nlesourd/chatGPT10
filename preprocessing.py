@@ -9,6 +9,7 @@ import nltk
 import re
 nltk.download("stopwords")
 STOPWORDS = set(nltk.corpus.stopwords.words("english"))
+import openai
 
 
 def textStoring(path_collection, path_sqldict):
@@ -41,7 +42,7 @@ def set_subcollection(collection_path:str, subcollection_path:str, indexes: List
         subcollection.writelines(selected_lines)
 
 
-def load_inverted_index(inverted_index_path: str, collection_path: str) -> None:
+def load_inverted_index(inverted_index_path: str, collection_path: str):
     """Generate inverted index if it not exists otherwise load it.
 
     Args:
@@ -59,6 +60,36 @@ def load_inverted_index(inverted_index_path: str, collection_path: str) -> None:
         df = pd.DataFrame({'docno': data.values[:,0].astype(str), 'text': data.values[:,1]})
         pd_indexer = pt.DFIndexer(inverted_index_path)
         indexref = pd_indexer.index(df["text"], df["docno"])
+        index = pt.IndexFactory.of(indexref)
+    else:
+        indexref = pt.IndexRef.of(inverted_index_path)
+        index = pt.IndexFactory.of(indexref)
+
+    return index
+
+def msmarco_generate():
+    dataset = pt.get_dataset("trec-deep-learning-passages")
+    with pt.io.autoopen(dataset.get_corpus()[0], 'rt') as corpusfile:
+        for l in corpusfile:
+            docno, passage = l.split("\t")
+            yield {'docno' : docno, 'text' : passage}
+
+def load_inverted_index_trec(inverted_index_path: str):
+    """Generate inverted index if it not exists otherwise load it.
+
+    Args:
+        inverted_index_path: Path for the folder of inverted index.
+        collection_path: Path of TSV collection file.
+
+    Returns:
+        Index loaded with pyterrier type.
+    """
+    if not pt.started():
+        pt.init(mem=8000)
+
+    if not os.path.exists(inverted_index_path):
+        iter_indexer = pt.IterDictIndexer(inverted_index_path)
+        indexref = iter_indexer.index(msmarco_generate(), meta={'docno' : 20, 'text': 4096})
         index = pt.IndexFactory.of(indexref)
     else:
         indexref = pt.IndexRef.of(inverted_index_path)
@@ -109,3 +140,19 @@ def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
     return ' '.join(query_pp)
 
 print(query_preprocessing("What about Ivanka?", STOPWORDS_DEL=True))
+
+
+
+# Set up your GPT-3 API key
+openai.api_key = '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'
+
+# Function to rewrite a query considering the context
+def rewriting_query(context, current_query):
+    prompt = f"Context: {context}, Current query: {current_query}"
+    response = openai.Completion.create(
+        engine="text-embedding-ada-002",  # You can choose an appropriate engine
+        prompt=prompt,
+        max_tokens=50,  # Adjust the length of the generated response
+        temperature=0.7  # Adjust the creativity of the generated response
+    )
+    return response['choices'][0]['text'].strip()
