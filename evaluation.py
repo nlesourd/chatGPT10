@@ -2,10 +2,7 @@ import csv
 import pyterrier as pt
 import re
 import pandas as pd
-from elasticsearch import Elasticsearch
 
-# Init
-es = Elasticsearch()
 if not pt.started():
     pt.init()
 
