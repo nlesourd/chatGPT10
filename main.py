@@ -19,5 +19,4 @@ print(inverted_index.getCollectionStatistics().toString())
 baseline = method.Baseline(inverted_index)
 advanced_method = method.AdvancedMethod(inverted_index)
 
-eval.rank_queries(QUERIES_TRAIN_PATH, "data/results.txt", method=advanced_method, nb_lines=1000, kaggle=False)
-
+eval.rank_queries(QUERIES_REWRITED_TEST_PATH, "./data/kaggle_advanced_method_v3.csv", method=advanced_method, kaggle=True)

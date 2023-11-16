@@ -9,7 +9,6 @@ import nltk
 import re
 nltk.download("stopwords")
 STOPWORDS = set(nltk.corpus.stopwords.words("english"))
-import openai
 
 
 def textStoring(path_collection, path_sqldict):
@@ -41,32 +40,6 @@ def set_subcollection(collection_path:str, subcollection_path:str, indexes: List
     with open(subcollection_path, "w", encoding="utf-8") as subcollection:
         subcollection.writelines(selected_lines)
 
-
-def load_inverted_index(inverted_index_path: str, collection_path: str):
-    """Generate inverted index if it not exists otherwise load it.
-
-    Args:
-        inverted_index_path: Path for the folder of inverted index.
-        collection_path: Path of TSV collection file.
-
-    Returns:
-        Index loaded with pyterrier type.
-    """
-    if not pt.started():
-        pt.init()
-
-    if not os.path.exists(inverted_index_path):
-        data = pd.read_csv(collection_path, delimiter='\t')
-        df = pd.DataFrame({'docno': data.values[:,0].astype(str), 'text': data.values[:,1]})
-        pd_indexer = pt.DFIndexer(inverted_index_path)
-        indexref = pd_indexer.index(df["text"], df["docno"])
-        index = pt.IndexFactory.of(indexref)
-    else:
-        indexref = pt.IndexRef.of(inverted_index_path)
-        index = pt.IndexFactory.of(indexref)
-
-    return index
-
 def msmarco_generate():
     dataset = pt.get_dataset("trec-deep-learning-passages")
     with pt.io.autoopen(dataset.get_corpus()[0], 'rt') as corpusfile:
@@ -97,29 +70,6 @@ def load_inverted_index_trec(inverted_index_path: str):
 
     return index
 
-def get_body(collection_path: str, docid: int) -> str:
-    """Get body according a docid and collection.
-
-    Arguments:
-        collection_path: path to reach the collection of documents.
-        docid: integer to identify the right document.
-
-    Returns:
-        Body of the document.
-    """
-    collection = pd.read_csv(collection_path, delimiter='\t')
-    return collection.values[docid,1]
-
-def rerank_preprocessing(collection_path:str, results: pd.DataFrame) -> pd.DataFrame:
-    collection = pd.read_csv(collection_path, delimiter='\t')
-    texts = []
-    nb_texts = len(results["qid"])
-    for i, docno in enumerate(results["docno"]):
-        print("Texts processed: ", (i*100)/nb_texts, " %")
-        texts.append(collection.values[int(docno)-1,1])
-    input_rerank = pd.DataFrame({'qid':results["qid"], 'query':results["query"], 'docno':results["docno"], 'text':texts})
-    return input_rerank
-
 def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
     """Preprocesses a string of text.
 
@@ -139,20 +89,13 @@ def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
     
     return ' '.join(query_pp)
 
-print(query_preprocessing("What about Ivanka?", STOPWORDS_DEL=True))
+def txt2csv(path_txt_input: str, path_csv_input: str, path_csv_output: str):
+    df = pd.read_csv(path_csv_input)
 
+    with open(path_txt_input, 'r') as file:
+        new_queries = file.readlines()
 
+    for i, new_query in enumerate(new_queries):
+        df.at[i, 'query'] = new_query.strip()
 
-# Set up your GPT-3 API key
-openai.api_key = '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'
-
-# Function to rewrite a query considering the context
-def rewriting_query(context, current_query):
-    prompt = f"Context: {context}, Current query: {current_query}"
-    response = openai.Completion.create(
-        engine="text-embedding-ada-002",  # You can choose an appropriate engine
-        prompt=prompt,
-        max_tokens=50,  # Adjust the length of the generated response
-        temperature=0.7  # Adjust the creativity of the generated response
-    )
-    return response['choices'][0]['text'].strip()
+    df.to_csv(path_csv_output, index=False)
