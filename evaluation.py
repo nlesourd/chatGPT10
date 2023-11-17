@@ -6,14 +6,14 @@ import pandas as pd
 if not pt.started():
     pt.init()
 
-def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_output: str, qid:int, 
+def set_results_with_trec_format(results:pd.core.frame.DataFrame, path_file_output:str, qid:int, 
                                  kaggle : bool, run_id="monoT5"):
     """ Add 1000 lines to results with the trec format
 
     Args:
-        results: Dataframe results of the retrieval ranking of each document with qid, docid, docno, rank, score and query
-        path_file_output: path of the output file with TREC format
-        run_id, optional, id of retrieval process  
+        results: Dataframe results of the retrieval ranking of each document with qid, docid, docno, rank, score and query.
+        path_file_output: path of the output file with TREC format.
+        run_id, optional, id of retrieval process.
     """
     results.sort_values(by=["score"], ascending=False, inplace=True)
     rank = 0
@@ -30,7 +30,16 @@ def set_results_with_trec_format(results: pd.core.frame.DataFrame, path_file_out
     with open(path_file_output, "a") as results_file:
         results_file.write(lines)
 
-def rank_queries(path_queries: str, path_file_output, method, kaggle = False):
+def rank_queries(path_queries: str, path_file_output:str, method, kaggle=False):
+    """ Rank queries from a csv file and save results in an other csv.
+
+    Args:
+        path_queries: path of csv file containing queries.
+        path_file_output: path of the output file with TREC format.
+        method: method you want to use (baseline or advanced method)
+        kaggle: default false, if you want the kaggle format to submit
+    """
+
     # Empty the file
     with open(path_file_output, 'w') as tsvfile:
         tsvfile.truncate()

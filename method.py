@@ -4,12 +4,17 @@ import pandas as pd
 from preprocessing import query_preprocessing
 import openai
 
-# Set up your GPT-3 API key
+# Set up your GPT-3 API key, has to be filled with your own
 openai.api_key = ''
 
 class Baseline:
     
     def __init__(self, inverted_index) -> None:
+        """Initialization of baseline.
+
+        Args:
+            inverted_index: inverted index needed for the BM25 process.
+        """
         self.inverted_index = inverted_index
         bm25 = pt.BatchRetrieve(self.inverted_index, wmodel="BM25", 
                               controls={"wmodel": "default", "ranker.string": "default", "results" : 1000})
@@ -18,7 +23,15 @@ class Baseline:
         self.rerank_model = None
         self.query_rewriting = False
 
-    def rank_query(self, query : str) -> pd.core.frame.DataFrame:
+    def rank_query(self, query: str) -> pd.core.frame.DataFrame:
+        """Rank query using the baseline pipeline.
+
+        Args:
+            query: sent by user to get 1000 most relevant documents.
+
+        Returns:
+            Results containing 1000 most relevant documents.
+        """
         query_ppc = query_preprocessing(query, STOPWORDS_DEL = False)
         print(query_ppc)
         return self.pipeline.search(query_ppc)
@@ -27,8 +40,15 @@ class Baseline:
 
 class AdvancedMethod:
     
-    def __init__(self, inverted_index, nb_reranked_mono=1000, nb_reranked_duo=20 ,query_rewriting=False) -> None:
+    def __init__(self, inverted_index, nb_reranked_mono=1000, nb_reranked_duo=10 ,query_rewriting=True) -> None:
+        """Initialization of advanced method.
 
+        Args:
+            inverted_index: inverted index needed for the BM25 process.
+            nb_reranked_mono: default 1000, number of documents reranked with monoT5
+            nb_reranked_duo: default 10, number of documents reranked with duoT5
+            query_rewriting: default True, if you want the query rewriting or not
+        """
         self.inverted_index = inverted_index
         bm25 = pt.BatchRetrieve(self.inverted_index, wmodel="BM25", 
                               controls={"wmodel": "default", "ranker.string": "default", "results" : nb_reranked_mono})
@@ -38,7 +58,15 @@ class AdvancedMethod:
         self.queries = []
         self.query_rewriting = query_rewriting
 
-    def rank_query(self, query : str) -> pd.core.frame.DataFrame:
+    def rank_query(self, query: str) -> pd.core.frame.DataFrame:
+        """Rank query using the advanced method pipeline.
+
+        Args:
+            query: sent by user to get 1000 most relevant documents.
+
+        Returns:
+            Results containing 1000 most relevant documents.
+        """
         self.queries.append(query)
         if self.query_rewriting:
             context = " ".join(self.queries)
@@ -48,7 +76,16 @@ class AdvancedMethod:
         results = self.pipeline.search(query_ppc)
         return results      
 
-    def rewriting_query(self, context, current_query):
+    def rewriting_query(self, context: str, current_query: str):
+        """Query rewriting using chatGPT3.5 .
+
+        Args:
+            context: concatenation of previous queries.
+            current query: last query submited by the user.
+
+        Returns:
+            New query rewrite using context and knoledge injection.
+        """
         prompt = f"Context: {context},Current query: {current_query}"
         response = openai.Completion.create(
             engine="text-davinci-003",  # You can choose an appropriate engine

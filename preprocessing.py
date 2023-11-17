@@ -1,9 +1,6 @@
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-amd64"
 import pyterrier as pt
-import pandas as pd
-from sqlitedict import SqliteDict
-import csv 
 from typing import List
 import nltk
 import re
@@ -11,36 +8,9 @@ nltk.download("stopwords")
 STOPWORDS = set(nltk.corpus.stopwords.words("english"))
 
 
-def textStoring(path_collection, path_sqldict):
-    if not os.path.exists(path_sqldict):
-        dictText = SqliteDict(path_sqldict)
-        # Limit of size 
-        csv.field_size_limit(4096 * 4096)
-        # Open the TSV file
-        with open(path_collection, 'r', newline='', encoding='utf-8') as tsvfile:
-            tsvreader = csv.reader(tsvfile, delimiter='\t')
-            
-            # Iteration on lines
-            for i, line in enumerate(tsvreader):
-                if i % 10000 == 0:
-                    print(i)
-                docno = line[0]
-                text = line[1]
-                dictText[docno] = text
-        dictText.update()
-        dictText.commit()
-        print("Index updated.")
-
-def set_subcollection(collection_path:str, subcollection_path:str, indexes: List):
-    with open(collection_path, "r", encoding="utf-8") as collection:
-        lines = collection.readlines()
-
-    selected_lines = [lines[i] for i in indexes]
-
-    with open(subcollection_path, "w", encoding="utf-8") as subcollection:
-        subcollection.writelines(selected_lines)
-
 def msmarco_generate():
+    """Generate msmarco collection."""
+
     dataset = pt.get_dataset("trec-deep-learning-passages")
     with pt.io.autoopen(dataset.get_corpus()[0], 'rt') as corpusfile:
         for l in corpusfile:
@@ -88,14 +58,3 @@ def query_preprocessing(query: str, STOPWORDS_DEL: True) -> List[str]:
         query_pp = [term for term in re.sub(r"[^\w]|_", " ", query).lower().split()]
     
     return ' '.join(query_pp)
-
-def txt2csv(path_txt_input: str, path_csv_input: str, path_csv_output: str):
-    df = pd.read_csv(path_csv_input)
-
-    with open(path_txt_input, 'r') as file:
-        new_queries = file.readlines()
-
-    for i, new_query in enumerate(new_queries):
-        df.at[i, 'query'] = new_query.strip()
-
-    df.to_csv(path_csv_output, index=False)
