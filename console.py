@@ -1,17 +1,19 @@
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-amd64"
 import pyterrier as pt
+import preprocessing as ppc
+import method
 
 if not pt.started():
     pt.init()
 
 ## Open the inverted index
-inverted_index_path = "./data/inverted_index"
-indexref = pt.IndexRef.of(inverted_index_path)
-index = pt.IndexFactory.of(indexref)
+INVERTED_INDEX_PATH = "./data/inverted_index"
+inverted_index = ppc.load_inverted_index_trec(INVERTED_INDEX_PATH)
 
-for kv in index.getLexicon():
- print((kv.getKey())+"\t"+ kv.getValue().toString())
+## Define methods
+baseline = method.Baseline(inverted_index)
+advanced_method = method.AdvancedMethod(inverted_index)
 
 def main():
     keywords_exp = {"help()" : "print the available commands", 
@@ -33,4 +35,10 @@ def main():
         elif query == "help()":
             for keyword in keywords_exp:
                 print("   - " + keyword + " --> " + keywords_exp[keyword])
-# main()
+        else:
+            # Find the 1000 best results
+            results = advanced_method.rank_query(query)
+            print(results)
+
+# Run the main
+main()
